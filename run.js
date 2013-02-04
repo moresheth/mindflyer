@@ -27,12 +27,16 @@ var arDrone         = require('ar-drone'),
 	offsetPitch = 0,
 	offsetRoll = 0,
 
+	// Max height in feet.
+	maxAltitude = 10,
+
 	// This changes as data comes in.
 	env = {
 		yaw: 0,
 		pitch: 0,
 		roll: 0,
-		attention: 0
+		attention: 0,
+		altitude: 0
 	};
 
 	start();
@@ -105,15 +109,19 @@ function initRazor() {
 	});
 }
 
-function handleMindwave(data) {
-//	console.log('mindwave: '+data);
+function json(data) {
 	var obj = {};
-
 	try {
 		obj = JSON.parse( data );
 	} catch (e) {
 		console.log( 'error parsing: ' + data );
 	}
+	return obj;
+}
+
+function handleMindwave(data) {
+//	console.log('mindwave: '+data);
+	var obj = json(data);
 
 	if ( !obj.eSense ) return true;
 	// Only using attention level for now.
@@ -135,6 +143,12 @@ function handleMindwave(data) {
 	// Or we did have the attention, and it
 	} else if ( !attentionTimer && attentionGained && att < attentionThreshold ) {
 		attentionTimer = setTimeout( checkAttentionDown, attentionDelay );
+	}
+
+	// If we are in flight, and the attention is above the threshold,
+	// apply the attention as the altitude.
+	if ( flying && att >= attentionThreshold ) {
+		setAltitude( att );
 	}
 }
 
@@ -160,14 +174,14 @@ function checkAttentionDown() {
 
 function handleRazor(data) {
 //	console.log('razor: '+data);
-	try {
-		var obj = JSON.parse( data );
-		env.yaw = obj.yaw;
-		env.pitch = obj.pitch;
-		env.roll = obj.roll;
-	} catch (e) {
-		console.log( 'error parsing: ' + data );
-	}
+	var obj = json(data);
+	// Apply the new settings to the current.
+	env.yaw = obj.yaw;
+	env.pitch = obj.pitch;
+	env.roll = obj.roll;
+	setYaw();
+	setPitch();
+	setRoll();
 //	console.log('yaw: ' + (env.yaw - offsetYaw).toFixed(2) + ', pitch: ' + (env.pitch - offsetPitch).toFixed(2) + ', roll: ' + (env.roll - offsetRoll).toFixed(2) );
 }
 
@@ -199,13 +213,54 @@ function land() {
 	}
 }
 
-// headThreshold
+function setAltitude( num ) {
+	// We get the desired alt by considering it a percentage of max height.
+	var targetAltitude = Math.round( ( num / maxAltitude ) * 100 ) / 100;
+	// If it's the same, then don't do anything.
+	if ( targetAltitude === env.altitude ) return true;
+	// We'll want to determine how fast it should change based on difference.
+	var speed = Math.round( Math.abs( env.altitude - targetAltitude ) / maxAltitude * 10 ) / 10;
+	// If the current altitude is less than the target, go up.
+	if ( env.altitude < targetAltitude ) {
+		if ( drone ) drone.up(speed);
+	} else {
+		if ( drone ) drone.down(speed);
+	}
+}
 
-// Negative yaw - left
-// Positive yaw - right
+
+// Negative yaw - counter-clockwise
+// Positive yaw - clockwise
+
+function setYaw() {
+	var speed = 0.5;
+	if ( env.yaw < 0-headThreshold ) {
+		if ( drone ) drone.counterClockwise(speed);
+	} else if ( env.yaw > headThreshold ) {
+		if ( drone ) drone.clockwise(speed);
+	}
+}
 
 // Negative pitch - down
 // Positive pitch - up
 
+function setPitch() {
+	var speed = 0.5;
+	if ( env.pitch < 0-headThreshold ) {
+		if ( drone ) drone.front(speed);
+	} else if ( env.pitch > headThreshold ) {
+		if ( drone ) drone.back(speed);
+	}
+}
+
 // Negative roll - right
 // Positive roll - left
+
+function setRoll() {
+	var speed = 0.5;
+	if ( env.roll < 0-headThreshold ) {
+		if ( drone ) drone.right(speed);
+	} else if ( env.roll > headThreshold ) {
+		if ( drone ) drone.left(speed);
+	}
+}
