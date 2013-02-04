@@ -1,0 +1,22 @@
+{
+  "name": "mindflyer",
+  "author": {
+    "name": "Micah Nolte",
+    "email": "holler@micahnolte.com"
+  },
+  "scripts": {
+    "start": "node run.js"
+  },
+  "version": "0.0.1",
+  "dependencies": {
+    "ar-drone": "*",
+    "serialport": "*",
+    "net": "*"
+  },
+  "analyze": false,
+  "readme": "Mind-controlled AR Drone using Mindwave Neurosky and Firefly Razor board.",
+  "description": "Mind-controlled AR Drone using Mindwave Neurosky and Firefly Razor board.",
+  "engines": {
+    "node": "0.8.x"
+  }
+}
